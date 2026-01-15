@@ -1,5 +1,3 @@
-// lib/storage.ts
-
 import { getPostVotes } from "./votes";
 
 export type Post = {
@@ -17,7 +15,7 @@ export function getPosts(): Post[] {
   return stored ? JSON.parse(stored) : [];
 }
 
-export function savePosts(posts: Post[]) {
+export function savePosts(posts: Post[]): void {
   if (typeof window === "undefined") return;
   localStorage.setItem(POSTS_KEY, JSON.stringify(posts));
 }
@@ -30,7 +28,7 @@ export function addPost(tweetUrl: string, userEmail: string): Post {
     postedBy: userEmail,
     postedAt: Date.now(),
   };
-  
+
   posts.unshift(newPost);
   savePosts(posts);
   return newPost;
@@ -38,7 +36,7 @@ export function addPost(tweetUrl: string, userEmail: string): Post {
 
 export function getPostWithVotes(postId: string) {
   const posts = getPosts();
-  const post = posts.find(p => p.id === postId);
+  const post = posts.find((p) => p.id === postId);
   if (!post) return null;
 
   const votes = getPostVotes(postId);
@@ -51,7 +49,7 @@ export function getPostWithVotes(postId: string) {
 
 export function getAllPostsWithVotes() {
   const posts = getPosts();
-  return posts.map(post => {
+  return posts.map((post) => {
     const votes = getPostVotes(post.id);
     return {
       ...post,

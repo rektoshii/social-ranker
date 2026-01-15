@@ -33,16 +33,16 @@ export default function LoginPage() {
     router.push("/");
   }
 
-  function handleKeyPress(e: React.KeyboardEvent) {
+  function handleKeyPress(e: React.KeyboardEvent<HTMLInputElement>) {
     if (e.key === "Enter" && captchaVerified) {
       handleLogin();
     }
   }
 
   return (
-    <main className="min-h-screen flex items-center justify-center bg-gray-50 p-6">
+    <main className="min-h-screen flex items-center justify-center bg-gray-50 p-4 sm:p-6">
       <div className="w-full max-w-md">
-        <div className="bg-white rounded-lg shadow-md p-8">
+        <div className="bg-white rounded-lg shadow-md p-6 sm:p-8">
           <div className="text-center mb-8">
             <h1 className="text-3xl font-bold mb-2">Social Ranker</h1>
             <p className="text-gray-600">Sign in to continue</p>
@@ -64,7 +64,6 @@ export default function LoginPage() {
               />
             </div>
 
-            {/* Captcha */}
             <Captcha onVerify={setCaptchaVerified} />
 
             {error && (
@@ -94,10 +93,12 @@ export default function LoginPage() {
         </div>
 
         <div className="mt-6 bg-blue-50 border border-blue-200 rounded-lg p-4">
-          <p className="text-sm font-semibold text-blue-800 mb-2">Quick Login:</p>
+          <p className="text-sm font-semibold text-blue-800 mb-2">
+            Quick Login:
+          </p>
           <button
             onClick={() => setEmail(ADMIN_EMAIL)}
-            className="text-sm text-blue-600 hover:underline block"
+            className="text-sm text-blue-600 hover:underline block w-full text-left"
           >
             {ADMIN_EMAIL} (Admin)
           </button>

@@ -1,64 +1,128 @@
-"use client"
+"use client";
 
-import { useEffect, useState } from "react"
-import { useRouter } from "next/navigation"
+import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 
-import { getAllPostsWithVotes } from "@/lib/storage"
-import { getCurrentUser, logout, canPost } from "@/lib/auth"
-import VoteButtons from "@/components/VoteButtons"
+import { getAllPostsWithVotes } from "@/lib/storage";
+import { getCurrentUser, logout, canPost, type User } from "@/lib/auth";
+import VoteButtons from "@/components/VoteButtons";
 
 /* ---------------- TYPES ---------------- */
 
 interface Post {
-  id: string
-  tweetUrl: string
-  upvotes: number
-  downvotes: number
-  postedBy: string
+  id: string;
+  tweetUrl: string;
+  upvotes: number;
+  downvotes: number;
+  postedBy: string;
+  postedAt: number;
 }
 
-interface User {
-  email: string
-  approved: boolean
-  role: "admin" | "voter" | "poster"
-}
+type SortOption =
+  | "trending-24h"
+  | "trending-7d"
+  | "trending-30d"
+  | "latest"
+  | "top";
 
 /* ---------------- PAGE ---------------- */
 
 export default function Home() {
-  const [posts, setPosts] = useState<Post[]>([])
-  const [currentUser, setCurrentUser] = useState<User | null>(null)
+  const router = useRouter();
 
-  const router = useRouter()
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [sortBy, setSortBy] = useState<SortOption>("trending-24h");
 
+  /* ---------- AUTH ONLY (NO POSTS HERE) ---------- */
   useEffect(() => {
-    const user = getCurrentUser()
-
+    const user = getCurrentUser();
     if (!user) {
-      router.replace("/login")
-      return
+      router.replace("/login");
+      return;
     }
+    setCurrentUser(user);
+  }, [router]);
 
-    setCurrentUser(user)
-    setPosts(getAllPostsWithVotes())
-  }, [])
+  /* ---------- POSTS (NO EFFECT) ---------- */
+  const posts: Post[] = useMemo(() => {
+    return getAllPostsWithVotes();
+  }, []);
+
+  /* ---------- TWITTER WIDGET ---------- */
+  useEffect(() => {
+    if (posts.length === 0) return;
+    if (typeof window !== "undefined" && "twttr" in window) {
+      (window as any).twttr.widgets.load();
+    }
+  }, [posts, sortBy]);
+
+  /* ---------- SORT HELPERS ---------- */
+  const calculateTrendingScore = useMemo(
+    () => (post: Post, hours: number) => {
+      const age = (Date.now() - post.postedAt) / 36e5;
+      if (age > hours) return -Infinity;
+      return (post.upvotes * 2 - post.downvotes) / Math.pow(age + 2, 1.5);
+    },
+    []
+  );
+
+  const sortedPosts = useMemo(() => {
+    const copy = [...posts];
+
+    switch (sortBy) {
+      case "trending-24h":
+        return copy.sort(
+          (a, b) =>
+            calculateTrendingScore(b, 24) -
+            calculateTrendingScore(a, 24)
+        );
+      case "trending-7d":
+        return copy.sort(
+          (a, b) =>
+            calculateTrendingScore(b, 168) -
+            calculateTrendingScore(a, 168)
+        );
+      case "trending-30d":
+        return copy.sort(
+          (a, b) =>
+            calculateTrendingScore(b, 720) -
+            calculateTrendingScore(a, 720)
+        );
+      case "latest":
+        return copy.sort((a, b) => b.postedAt - a.postedAt);
+      case "top":
+        return copy.sort(
+          (a, b) =>
+            b.upvotes * 2 - b.downvotes -
+            (a.upvotes * 2 - a.downvotes)
+        );
+      default:
+        return copy;
+    }
+  }, [posts, sortBy, calculateTrendingScore]);
 
   function handleLogout() {
-    logout()
-    router.replace("/login")
+    logout();
+    router.replace("/login");
   }
 
   if (!currentUser) {
-    return <div className="p-6">Loading...</div>
+    return (
+      <div className="min-h-screen flex items-center justify-center text-gray-500">
+        Loading…
+      </div>
+    );
   }
 
-  return (
-    <main className="p-6 max-w-xl mx-auto">
-      {/* ---------- HEADER ---------- */}
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold">Feed</h1>
+  /* ---------------- UI ---------------- */
 
-        <div className="flex items-center gap-4">
+  return (
+    <main className="p-6 max-w-2xl mx-auto">
+      {/* HEADER */}
+      <div className="flex justify-between items-center mb-6">
+        <h1 className="text-2xl font-bold">Social Ranker</h1>
+
+        <div className="flex items-center gap-3">
           <span className="text-sm text-gray-600">
             {currentUser.email}
           </span>
@@ -66,7 +130,7 @@ export default function Home() {
           {canPost() && (
             <button
               onClick={() => router.push("/submit")}
-              className="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded text-sm"
+              className="bg-blue-500 text-white px-3 py-1 rounded text-sm"
             >
               + Submit
             </button>
@@ -81,60 +145,66 @@ export default function Home() {
 
           <button
             onClick={handleLogout}
-            className="bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded text-sm"
+            className="bg-red-500 text-white px-3 py-1 rounded text-sm"
           >
             Logout
           </button>
         </div>
       </div>
 
-      {/* ---------- POSTS ---------- */}
-      {posts.length === 0 ? (
-        <div className="text-center py-12 bg-gray-50 rounded-lg">
-          <p className="text-gray-500 mb-2">No posts yet</p>
-
-          {canPost() && (
+      {/* SORT */}
+      <div className="mb-6 bg-white border rounded-lg p-4">
+        <div className="flex flex-wrap gap-2">
+          {[
+            ["trending-24h", "🔥 24h"],
+            ["trending-7d", "📈 7d"],
+            ["trending-30d", "📊 30d"],
+            ["latest", "⏰ Latest"],
+            ["top", "⭐ Top"],
+          ].map(([v, label]) => (
             <button
-              onClick={() => router.push("/submit")}
-              className="text-blue-500 hover:underline text-sm"
+              key={v}
+              onClick={() => setSortBy(v as SortOption)}
+              className={`px-4 py-2 rounded text-sm ${
+                sortBy === v
+                  ? "bg-blue-500 text-white"
+                  : "bg-gray-100"
+              }`}
             >
-              Be the first to add a tweet!
+              {label}
             </button>
-          )}
+          ))}
         </div>
-      ) : (
-        posts.map((post: Post) => {
-          const score = post.upvotes * 2 - post.downvotes
+      </div>
 
-          return (
-            <div
-              key={post.id}
-              className="border border-gray-200 p-4 mb-4 rounded-lg shadow-sm hover:shadow-md transition-shadow bg-white"
-            >
-              <iframe
-                src={`https://twitframe.com/show?url=${post.tweetUrl}`}
-                className="w-full rounded"
-                height={300}
-              />
+      {/* POSTS */}
+      {sortedPosts.map((post) => (
+        <div
+          key={post.id}
+          className="border p-4 mb-4 rounded bg-white"
+        >
+          <blockquote className="twitter-tweet">
+            <a href={post.tweetUrl}>Loading tweet…</a>
+          </blockquote>
 
-              <div className="flex justify-between mt-3 text-sm text-gray-600">
-                <span className="font-semibold">
-                  Score: {score}
-                </span>
-                <span>
-                  👍 {post.upvotes} | 👎 {post.downvotes}
-                </span>
-              </div>
+          <a
+            href={post.tweetUrl}
+            target="_blank"
+            className="text-blue-500 text-sm block my-2"
+          >
+            View on X →
+          </a>
 
-              <VoteButtons postId={post.id} />
+          <VoteButtons postId={post.id} />
 
-              <p className="text-xs text-gray-400 mt-2">
-                Posted by {post.postedBy}
-              </p>
-            </div>
-          )
-        })
-      )}
+          <div className="text-xs text-gray-400 mt-2 flex justify-between">
+            <span>{post.postedBy}</span>
+            <span>
+              {new Date(post.postedAt).toLocaleString()}
+            </span>
+          </div>
+        </div>
+      ))}
     </main>
-  )
+  );
 }

@@ -1,68 +1,97 @@
-export const ADMIN_EMAIL = "admin@socialranker.com";
+// lib/auth.ts
 
 export type UserRole = "admin" | "voter" | "poster" | "viewer";
 
-export type User = {
+export interface User {
   email: string;
-  username: string;
   role: UserRole;
-  approved: boolean;
-  createdAt: number;
-};
-
-export function getCurrentUser(): User | null {
-  if (typeof window === "undefined") return null;
-  return JSON.parse(localStorage.getItem("currentUser") || "null");
 }
 
-export function getAllUsers(): Record<string, User> {
+/* ---------------- STORAGE HELPERS ---------------- */
+
+function getUsersObject(): Record<string, User> {
   if (typeof window === "undefined") return {};
-  return JSON.parse(localStorage.getItem("users") || "{}");
+
+  const raw = localStorage.getItem("users");
+  if (!raw) return {};
+
+  try {
+    return JSON.parse(raw);
+  } catch {
+    return {};
+  }
 }
 
-export function saveAllUsers(users: Record<string, User>) {
+function saveUsersObject(users: Record<string, User>) {
   localStorage.setItem("users", JSON.stringify(users));
 }
 
-export function login(email: string): User {
-  const users = getAllUsers();
-  const username = email.split("@")[0];
+/* ---------------- AUTH ---------------- */
 
-  // Check if user exists, if not create them
-  if (!users[email]) {
-    users[email] = {
-      email,
-      username,
-      role: email === ADMIN_EMAIL ? "admin" : "viewer",
-      approved: email === ADMIN_EMAIL, // Auto-approve admin
-      createdAt: Date.now(),
-    };
-    saveAllUsers(users);
+export function getCurrentUser(): User | null {
+  if (typeof window === "undefined") return null;
+
+  const raw = localStorage.getItem("currentUser");
+  if (!raw) return null;
+
+  try {
+    return JSON.parse(raw) as User;
+  } catch {
+    return null;
   }
-
-  // Set current user
-  localStorage.setItem("currentUser", JSON.stringify(users[email]));
-  
-  return users[email];
 }
 
 export function logout() {
-  if (typeof window === "undefined") return;
   localStorage.removeItem("currentUser");
 }
 
-export function isAuthenticated(): boolean {
-  return getCurrentUser() !== null;
+/* ---------------- USERS ---------------- */
+
+export function getAllUsers(): User[] {
+  const usersObj = getUsersObject();
+  return Object.values(usersObj);
 }
 
-export function canPost(): boolean {
-  const user = getCurrentUser();
-  if (!user || !user.approved) return false;
-  return user.role === "admin" || user.role === "poster";
+export function registerUser(email: string) {
+  const users = getUsersObject();
+
+  if (!users[email]) {
+    users[email] = {
+      email,
+      role: "viewer", // default role
+    };
+  }
+
+  saveUsersObject(users);
+  localStorage.setItem("currentUser", JSON.stringify(users[email]));
 }
 
-export function canVote(): boolean {
-  const user = getCurrentUser();
-  if (!user || !user.approved) return false;
-  return user.role === "admin" || user.role === "voter";
+/* ---------------- ROLE CHECKS ---------------- */
+
+export function canPost(user?: User | null): boolean {
+  if (!user) return false;
+  return user.role === "poster" || user.role === "admin";
+}
+
+export function canVote(user?: User | null): boolean {
+  if (!user) return false;
+  return user.role === "voter" || user.role === "admin";
+}
+
+/* ---------------- ADMIN ACTIONS ---------------- */
+
+export function approvePoster(email: string) {
+  const users = getUsersObject();
+  if (!users[email]) return;
+
+  users[email].role = "poster";
+  saveUsersObject(users);
+}
+
+export function approveVoter(email: string) {
+  const users = getUsersObject();
+  if (!users[email]) return;
+
+  users[email].role = "voter";
+  saveUsersObject(users);
 }
