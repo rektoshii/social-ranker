@@ -1,51 +1,48 @@
-"use client";
+"use client"
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
-import { login, ADMIN_EMAIL } from "@/lib/auth";
+import { useState } from "react"
+import { useRouter } from "next/navigation"
+
+const ADMIN_EMAIL = "admin@example.com" // MUST MATCH auth.ts
 
 export default function LoginPage() {
-  const [email, setEmail] = useState("");
-  const [error, setError] = useState("");
-  const router = useRouter();
+  const [email, setEmail] = useState("")
+  const router = useRouter()
 
-  function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    setError("");
-
-    const user = login(email);
-
-    if (!user) {
-      setError("Invalid or unapproved user");
-      return;
+  function handleLogin() {
+    if (!email) {
+      alert("Enter an email")
+      return
     }
 
-    router.push("/");
+    const user = {
+      email,
+      role: email === ADMIN_EMAIL ? "admin" : "viewer",
+      approved: email === ADMIN_EMAIL
+    }
+
+    localStorage.setItem("currentUser", JSON.stringify(user))
+
+    router.push(user.role === "admin" ? "/admin" : "/")
   }
 
   return (
-    <main style={{ maxWidth: 400, margin: "100px auto" }}>
+    <div style={{ padding: 40 }}>
       <h1>Login</h1>
 
-      <form onSubmit={handleSubmit}>
-        <input
-          type="email"
-          placeholder="Email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          style={{ width: "100%", padding: 10, marginBottom: 10 }}
-        />
+      <input
+        type="email"
+        placeholder="Enter email"
+        value={email}
+        onChange={(e) => setEmail(e.target.value)}
+        style={{ border: "1px solid #ccc", padding: 8 }}
+      />
 
-        {error && <p style={{ color: "red" }}>{error}</p>}
+      <br /><br />
 
-        <button type="submit" style={{ padding: 10, width: "100%" }}>
-          Login
-        </button>
-
-        <p style={{ marginTop: 10, fontSize: 12 }}>
-          Admin email: <strong>{ADMIN_EMAIL}</strong>
-        </p>
-      </form>
-    </main>
-  );
+      <button onClick={handleLogin}>
+        Login
+      </button>
+    </div>
+  )
 }

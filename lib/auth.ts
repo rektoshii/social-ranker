@@ -10,7 +10,7 @@ export type User = {
   createdAt: number;
 };
 
-export const ADMIN_EMAIL = "admin@example.com"; // CHANGE THIS
+export const ADMIN_EMAIL = "adminme@gmail.com"; // CHANGE THIS
 
 const USERS_KEY = "users";
 const CURRENT_USER_KEY = "currentUser";

@@ -2,77 +2,149 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-
 import {
+  ADMIN_EMAIL,
   getAllUsers,
+  saveAllUsers,
   getCurrentUser,
   logout,
   type User,
+  type UserRole,
 } from "@/lib/auth";
 
 export default function AdminPage() {
-  const [users, setUsers] = useState<User[]>([]);
+  const [users, setUsers] = useState<Record<string, User>>({});
   const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
 
   const router = useRouter();
 
-  /* ---------- AUTH + LOAD USERS ---------- */
+  /* ---------------- AUTH GUARD ---------------- */
+
   useEffect(() => {
     const user = getCurrentUser();
 
-    if (!user || user.role !== "admin") {
+    if (!user || user.email !== ADMIN_EMAIL) {
       router.replace("/");
       return;
     }
 
     setCurrentUser(user);
-
-    const data = getAllUsers();
-    setUsers(data);
+    setUsers(getAllUsers());
+    setIsLoading(false);
   }, [router]);
+
+  /* ---------------- HELPERS ---------------- */
+
+  function updateUserRole(
+    email: string,
+    role: UserRole,
+    approved: boolean
+  ) {
+    const updated = { ...users };
+
+    updated[email] = {
+      ...updated[email],
+      role,
+      approved,
+    };
+
+    saveAllUsers(updated);
+    setUsers(updated);
+  }
+
+  function deleteUser(email: string) {
+    if (!confirm(`Delete ${email}?`)) return;
+
+    const updated = { ...users };
+    delete updated[email];
+
+    saveAllUsers(updated);
+    setUsers(updated);
+  }
 
   function handleLogout() {
     logout();
-    router.replace("/login");
+    router.push("/login");
   }
 
-  if (!currentUser) {
-    return <div className="p-6">Loading...</div>;
+  /* ---------------- RENDER GUARD ---------------- */
+
+  if (isLoading || !currentUser) {
+    return <p style={{ padding: 20 }}>Loading…</p>;
   }
+
+  /* ✅ CONVERT OBJECT → ARRAY ONCE */
+  const userList = Object.values(users).sort((a, b) => {
+    if (a.email === ADMIN_EMAIL) return -1;
+    if (b.email === ADMIN_EMAIL) return 1;
+    return b.createdAt - a.createdAt;
+  });
+
+  /* ---------------- UI ---------------- */
 
   return (
-    <main className="p-6 max-w-3xl mx-auto">
-      {/* Header */}
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold">Admin Dashboard</h1>
+    <main style={{ maxWidth: 900, margin: "40px auto", padding: 20 }}>
+      <header style={{ display: "flex", justifyContent: "space-between" }}>
+        <h1>Admin Panel</h1>
+        <button onClick={handleLogout}>Logout</button>
+      </header>
 
-        <button
-          onClick={handleLogout}
-          className="bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded text-sm"
-        >
-          Logout
-        </button>
-      </div>
+      <hr style={{ margin: "20px 0" }} />
 
-      {/* Users */}
-      {users.length === 0 ? (
-        <p className="text-gray-500">No users found</p>
+      {userList.length === 0 ? (
+        <p>No users found</p>
       ) : (
-        <div className="space-y-4">
-          {users.map((user) => (
-            <div
-              key={user.email}
-              className="border p-4 rounded bg-white flex justify-between items-center"
-            >
-              <div>
-                <p className="font-semibold">{user.email}</p>
-                <p className="text-sm text-gray-500">
-                  Role: {user.role}
-                </p>
+        userList.map((user) => (
+          <div
+            key={user.email}
+            style={{
+              border: "1px solid #ddd",
+              padding: 12,
+              marginBottom: 10,
+            }}
+          >
+            <p>
+              <strong>{user.email}</strong>
+            </p>
+            <p>
+              Role: <b>{user.role}</b> | Approved:{" "}
+              <b>{user.approved ? "Yes" : "No"}</b>
+            </p>
+
+            {user.email !== ADMIN_EMAIL && (
+              <div style={{ marginTop: 8 }}>
+                <button
+                  onClick={() =>
+                    updateUserRole(user.email, "voter", true)
+                  }
+                >
+                  Make Voter
+                </button>{" "}
+                <button
+                  onClick={() =>
+                    updateUserRole(user.email, "poster", true)
+                  }
+                >
+                  Make Poster
+                </button>{" "}
+                <button
+                  onClick={() =>
+                    updateUserRole(user.email, "voter", false)
+                  }
+                >
+                  Revoke
+                </button>{" "}
+                <button
+                  onClick={() => deleteUser(user.email)}
+                  style={{ color: "red" }}
+                >
+                  Delete
+                </button>
               </div>
-            </div>
-          ))}
-        </div>
+            )}
+          </div>
+        ))
       )}
     </main>
   );
